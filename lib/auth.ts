@@ -23,6 +23,10 @@ export const extractBearerToken = (request: Request): string | null => {
 };
 
 export const isAuthorizedRequest = (request: Request): { ok: true; token: string } | { ok: false } => {
+  if (env.mcpAuthMode === "none") {
+    return { ok: true, token: "anonymous" };
+  }
+
   const bearerToken = extractBearerToken(request);
 
   if (!bearerToken || env.mcpBearerTokens.length === 0) {
@@ -38,4 +42,4 @@ export const isAuthorizedRequest = (request: Request): { ok: true; token: string
   }
 
   return { ok: false };
-}
+};
