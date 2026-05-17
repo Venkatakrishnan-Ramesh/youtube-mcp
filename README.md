@@ -84,6 +84,7 @@ lib/
   rate-limit.ts
   redis.ts
   supadata.ts
+  transcript-cache.ts
   youtube.ts
 types/
   index.ts
@@ -105,6 +106,8 @@ Recommended:
 - `UPSTASH_REDIS_REST_TOKEN`
 - `RESEND_API_KEY`
 - `DIGEST_EMAIL_TO`
+- `TRANSCRIPT_CACHE_TTL_SECONDS`
+- `TRANSCRIPT_FAILURE_CACHE_TTL_SECONDS`
 
 ## Local development
 
@@ -192,6 +195,22 @@ Without Upstash:
 
 - rate limiting falls back to in-memory best effort
 - digest event storage is also in-memory and not durable across cold starts
+- transcript caching also falls back to in-memory and resets on cold starts
+
+## Transcript retries and caching
+
+The server reduces wasted Supadata usage in three ways:
+
+- successful transcript lookups are cached
+- failures like quota and rate-limit responses are cached briefly
+- transcript lookups retry once with backoff on Supadata `429` by default
+
+Relevant env vars:
+
+- `TRANSCRIPT_CACHE_TTL_SECONDS` default `43200`
+- `TRANSCRIPT_FAILURE_CACHE_TTL_SECONDS` default `600`
+- `SUPADATA_RETRY_COUNT` default `1`
+- `SUPADATA_RETRY_BASE_DELAY_MS` default `800`
 
 ## Resend setup
 
@@ -252,12 +271,38 @@ Important:
 - ChatGPT supports OAuth, no authentication, and mixed authentication in developer mode.
 - For ChatGPT app creation, use `MCP_AUTH_MODE=none`.
 - If you need private auth later, move to OAuth rather than static bearer auth.
+- If the tool reports `Transcript status: unavailable`, treat the response as metadata-only and do not infer spoken content from title or description.
 
 ## Direct OpenAI / Anthropic API usage
 
 Anthropic and OpenAI both support remote MCP servers over HTTP.
 
 You can call this server directly from API requests and attach the bearer token in each request.
+
+## Prompt templates
+
+Strict transcript-only:
+
+```text
+Use the yt app only. If transcript extraction fails or captions are unavailable, stop and explicitly say "No transcript available". Do not infer the spoken content from metadata, title, description, or browsing.
+```
+
+Hybrid fallback:
+
+```text
+Use the yt app first. If transcript is available, summarize the spoken content. If transcript is unavailable, say that clearly and then provide a separate metadata-based context note.
+```
+
+Metadata plus transcript check:
+
+```text
+Use the yt app only. Return:
+1. transcript status
+2. transcript source
+3. whether this was a cache hit
+4. full metadata
+5. transcript text if available
+```
 
 ## Manual digest trigger
 
