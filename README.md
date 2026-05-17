@@ -96,10 +96,11 @@ Copy `.env.example` to `.env.local` and fill in the values.
 Required:
 
 - `SUPADATA_API_KEY`
-- `MCP_BEARER_TOKEN`
+- `MCP_AUTH_MODE`
 
 Recommended:
 
+- `MCP_BEARER_TOKEN` when `MCP_AUTH_MODE=bearer`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `RESEND_API_KEY`
@@ -118,11 +119,13 @@ Your local MCP endpoint will be:
 http://localhost:3000/api/mcp
 ```
 
-All MCP requests must include:
+If `MCP_AUTH_MODE=bearer`, all MCP requests must include:
 
 ```text
 Authorization: Bearer <your token>
 ```
+
+If `MCP_AUTH_MODE=none`, the MCP endpoint is unauthenticated.
 
 ## GitHub repo creation
 
@@ -154,7 +157,8 @@ git push -u origin main
 4. Add env vars in Vercel Project Settings:
    - `APP_URL`
    - `SUPADATA_API_KEY`
-   - `MCP_BEARER_TOKEN`
+   - `MCP_AUTH_MODE`
+   - `MCP_BEARER_TOKEN` if using bearer mode
    - optionally Upstash and Resend vars
 5. Deploy.
 6. After first deploy, set:
@@ -225,8 +229,8 @@ Claude remote MCP custom connectors are configured from Claude settings.
 
 Important:
 
-- This server currently uses static bearer auth at the HTTP layer.
-- If Claude’s connector UI does not provide a way to attach the bearer token for your account, you will need an OAuth front-end or an MCP auth proxy for Claude web/mobile.
+- For easy ChatGPT app setup, set `MCP_AUTH_MODE=none`.
+- If you keep `MCP_AUTH_MODE=bearer`, Claude’s connector UI may need a way to attach the bearer token for your account.
 - For direct Anthropic API usage, remote MCP supports bearer authorization tokens.
 
 Anthropic references:
@@ -246,8 +250,8 @@ OpenAI references:
 Important:
 
 - ChatGPT supports OAuth, no authentication, and mixed authentication in developer mode.
-- This repo currently protects the MCP endpoint with a bearer token, so the easiest use path is direct API usage where you can pass `authorization`.
-- If you want first-class ChatGPT app auth, add OAuth later.
+- For ChatGPT app creation, use `MCP_AUTH_MODE=none`.
+- If you need private auth later, move to OAuth rather than static bearer auth.
 
 ## Direct OpenAI / Anthropic API usage
 
