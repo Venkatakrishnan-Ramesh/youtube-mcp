@@ -13,9 +13,15 @@ const parseTokens = (): string[] => {
   return Array.from(new Set([...(single ? [single] : []), ...many]));
 };
 
+const parseAuthMode = (): "bearer" | "none" => {
+  const value = process.env.MCP_AUTH_MODE?.trim().toLowerCase();
+  return value === "none" ? "none" : "bearer";
+};
+
 export const env = {
   appUrl: process.env.APP_URL?.trim() ?? "",
   supadataApiKey: process.env.SUPADATA_API_KEY?.trim() ?? "",
+  mcpAuthMode: parseAuthMode(),
   mcpBearerTokens: parseTokens(),
   rateLimitMaxRequests: parseInteger(process.env.RATE_LIMIT_MAX_REQUESTS, 50),
   rateLimitWindow: process.env.RATE_LIMIT_WINDOW?.trim() || "1 d",
