@@ -77,7 +77,7 @@ const tooManyRequests = (retryAfterSeconds?: number): Response => {
 };
 
 const handleAuthorizedMcpRequest = async (request: Request): Promise<Response> => {
-  ensureRequiredEnv(["supadataApiKey", "mcpBearerTokens"]);
+  ensureRequiredEnv(["supadataApiKey"]);
 
   const auth = isAuthorizedRequest(request);
   if (!auth.ok) {
