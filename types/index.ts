@@ -11,6 +11,9 @@ export type TranscriptLookupResult = {
   availableTranscriptLanguages: string[];
   hasCaptions: boolean;
   fallbackReason: string | null;
+  transcriptStatus: "available" | "unavailable";
+  transcriptSource: "supadata-native";
+  fromCache: boolean;
 };
 
 export type DigestEvent = {
