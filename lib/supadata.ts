@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { env, ensureRequiredEnv } from "@/lib/env";
+import { getTranscriptCache, setTranscriptCache } from "@/lib/transcript-cache";
 import { buildCanonicalYouTubeUrl, extractYouTubeVideoId } from "@/lib/youtube";
 import type { TranscriptLookupResult } from "@/types";
 
@@ -26,6 +27,12 @@ const metadataResponseSchema = z.object({
 
 const SUPADATA_BASE_URL = "https://api.supadata.ai/v1";
 
+const sleep = async (delayMs: number): Promise<void> => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+};
+
 const fetchJson = async <T>(url: string, schema: z.ZodSchema<T>): Promise<T> => {
   const response = await fetch(url, {
     headers: {
@@ -43,6 +50,28 @@ const fetchJson = async <T>(url: string, schema: z.ZodSchema<T>): Promise<T> => 
   return schema.parse(json);
 };
 
+const fetchTranscriptWithRetry = async (url: string): Promise<z.infer<typeof transcriptResponseSchema>> => {
+  let attempt = 0;
+  let delayMs = env.supadataRetryBaseDelayMs;
+
+  while (true) {
+    try {
+      return await fetchJson(url, transcriptResponseSchema);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Transcript lookup failed.";
+      const shouldRetry = message.includes("(429)") && attempt < env.supadataRetryCount;
+
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      await sleep(delayMs);
+      attempt += 1;
+      delayMs *= 2;
+    }
+  }
+};
+
 export const getYouTubeTranscriptAndMetadata = async (
   rawUrl: string,
   language?: string
@@ -50,6 +79,11 @@ export const getYouTubeTranscriptAndMetadata = async (
   ensureRequiredEnv(["supadataApiKey"]);
 
   const videoId = extractYouTubeVideoId(rawUrl);
+  const cached = await getTranscriptCache(videoId, language);
+  if (cached) {
+    return cached;
+  }
+
   const canonicalUrl = buildCanonicalYouTubeUrl(videoId);
 
   const transcriptUrl = new URL(`${SUPADATA_BASE_URL}/transcript`);
@@ -65,7 +99,7 @@ export const getYouTubeTranscriptAndMetadata = async (
 
   const [metadataResult, transcriptOutcome] = await Promise.allSettled([
     fetchJson(metadataUrl.toString(), metadataResponseSchema),
-    fetchJson(transcriptUrl.toString(), transcriptResponseSchema)
+    fetchTranscriptWithRetry(transcriptUrl.toString())
   ]);
 
   if (metadataResult.status === "rejected") {
@@ -107,7 +141,7 @@ export const getYouTubeTranscriptAndMetadata = async (
     fallbackReason = `Requested language "${language}" was unavailable. Returned "${transcriptLanguage}" instead.`;
   }
 
-  return {
+  const result: TranscriptLookupResult = {
     videoId,
     canonicalUrl,
     title: metadata.title ?? null,
@@ -119,6 +153,12 @@ export const getYouTubeTranscriptAndMetadata = async (
     transcriptLanguage,
     availableTranscriptLanguages,
     hasCaptions,
-    fallbackReason
+    fallbackReason,
+    transcriptStatus: hasCaptions ? "available" : "unavailable",
+    transcriptSource: "supadata-native",
+    fromCache: false
   };
+
+  await setTranscriptCache(result, language);
+  return result;
 };
